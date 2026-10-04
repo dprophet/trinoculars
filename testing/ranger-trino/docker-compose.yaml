@@ -1,0 +1,86 @@
+# Test rig: Trino + Apache Ranger, wired together.
+#
+#   docker compose up -d        # first start takes ~2-3 minutes (Ranger schema setup)
+#   ./smoke-test.sh             # checks that Ranger policies are enforced by Trino
+#   docker compose down         # stop and discard everything (state is not persisted)
+#
+# Ranger Admin UI: http://localhost:6080   (admin / rangerR0cks!)
+# Trino:           http://localhost:8080   (no authentication; pass any user name)
+#
+# Uses the images Apache publishes (apache/ranger, apache/ranger-db) and the official Trino
+# image. Trino ships the Ranger access-control plugin, so only configuration is mounted.
+# Ranger auditing is switched off: no Solr, ZooKeeper or Kerberos are needed.
+
+name: trinocular-ranger-trino
+
+x-ranger-db-env: &ranger-db-env
+  # The Ranger images read these. RANGER_DB_PASSWORD is also the Ranger `admin` password,
+  # and the image's first-start script logs in with rangerR0cks!, so keep it unless you
+  # also change that script. Test-only credentials.
+  POSTGRES_PASSWORD: rangerR0cks!
+  RANGER_DB_USER: rangeradmin
+  RANGER_DB_PASSWORD: rangerR0cks!
+
+services:
+  ranger-db:
+    image: apache/ranger-db:${RANGER_VERSION:-2.9.0}
+    hostname: ranger-db # the Ranger image expects this host name
+    environment: *ranger-db-env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -q"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  ranger:
+    image: apache/ranger:${RANGER_VERSION:-2.9.0}
+    hostname: ranger
+    environment: *ranger-db-env
+    ports:
+      - "${RANGER_PORT:-6080}:6080"
+    depends_on:
+      ranger-db:
+        condition: service_healthy
+    healthcheck:
+      # Healthy once Admin is up AND its first-start script has created the dev_trino service.
+      test: ["CMD-SHELL", "curl -sf -u admin:rangerR0cks! http://localhost:6080/service/public/v2/api/service/name/dev_trino >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+
+  # One-shot: creates test users/groups and the baseline + sample policies, then exits.
+  ranger-bootstrap:
+    image: apache/ranger:${RANGER_VERSION:-2.9.0}
+    entrypoint: ["python3", "/bootstrap/bootstrap.py"]
+    environment:
+      RANGER_URL: http://ranger:6080
+      RANGER_SERVICE: dev_trino
+    volumes:
+      - ./ranger/bootstrap.py:/bootstrap/bootstrap.py:ro
+    depends_on:
+      ranger:
+        condition: service_healthy
+    restart: "no"
+
+  trino:
+    image: trinodb/trino:${TRINO_VERSION:-483}
+    hostname: ranger-trino # dev_trino's jdbc.url points here (used for Ranger UI lookups)
+    ports:
+      - "${TRINO_PORT:-8080}:8080"
+    volumes:
+      - ./trino/access-control.properties:/etc/trino/access-control.properties:ro
+      - ./trino/ranger-trino-security.xml:/etc/trino/ranger-trino-security.xml:ro
+      - ./trino/ranger-trino-audit.xml:/etc/trino/ranger-trino-audit.xml:ro
+      - ./trino/ranger-policymgr-ssl.xml:/etc/trino/ranger-policymgr-ssl.xml:ro
+      - ./trino/group-provider.properties:/etc/trino/group-provider.properties:ro
+      - ./trino/groups.txt:/etc/trino/groups.txt:ro
+    depends_on:
+      ranger-bootstrap:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/usr/lib/trino/bin/health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s

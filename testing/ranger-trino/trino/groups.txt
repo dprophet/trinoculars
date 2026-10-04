@@ -1,0 +1,4 @@
+analysts:alice
+data-eng:bob
+finance:carol
+trino-admins:admin

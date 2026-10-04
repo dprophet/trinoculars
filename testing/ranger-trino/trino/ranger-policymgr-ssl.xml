@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<!-- Ranger Admin is plain HTTP in this rig; no SSL settings needed. -->
+<configuration>
+</configuration>

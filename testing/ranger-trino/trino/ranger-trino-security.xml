@@ -1,0 +1,49 @@
+<?xml version="1.0"?>
+<!-- Trino's Ranger plugin: where to fetch policies from. Test-only credentials. -->
+<configuration>
+  <property>
+    <name>ranger.plugin.trino.service.name</name>
+    <value>dev_trino</value>
+  </property>
+  <property>
+    <name>ranger.plugin.trino.policy.source.impl</name>
+    <value>org.apache.ranger.admin.client.RangerAdminRESTClient</value>
+  </property>
+  <property>
+    <name>ranger.plugin.trino.policy.rest.url</name>
+    <value>http://ranger:6080</value>
+  </property>
+  <property>
+    <name>ranger.plugin.trino.policy.rest.ssl.config.file</name>
+    <value>/etc/trino/ranger-policymgr-ssl.xml</value>
+  </property>
+  <property>
+    <!-- Ranger Admin login used to download policies (as in Apache's dev sandbox). -->
+    <name>ranger.plugin.trino.policy.rest.client.username</name>
+    <value>admin</value>
+  </property>
+  <property>
+    <name>ranger.plugin.trino.policy.rest.client.password</name>
+    <value>rangerR0cks!</value>
+  </property>
+  <property>
+    <!-- Pick up policy edits quickly; production would use a longer interval. -->
+    <name>ranger.plugin.trino.policy.pollIntervalMs</name>
+    <value>5000</value>
+  </property>
+  <property>
+    <name>ranger.plugin.trino.policy.cache.dir</name>
+    <value>/tmp</value>
+  </property>
+  <property>
+    <!-- Take group membership from Trino's group provider (groups.txt), not from Ranger
+         usersync, which this rig does not run. -->
+    <name>ranger.plugin.trino.use.rangerGroups</name>
+    <value>false</value>
+  </property>
+  <property>
+    <!-- Members of this group bypass Ranger policies (handy for test setup). -->
+    <name>ranger.plugin.trino.super.groups</name>
+    <value>trino-admins</value>
+  </property>
+</configuration>
