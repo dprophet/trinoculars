@@ -1,6 +1,7 @@
 {
   "name": "trinocular",
   "private": true,
+  "license": "Apache-2.0",
   "version": "0.0.0",
   "type": "module",
   "description": "Trinocular — Trino authorization policy editor (Phase 0 wireframe)",
